@@ -46,7 +46,7 @@ class ExtractContent(object):
 
     # Sets option parameters to default.
     # Parameter opt is given as Dictionary.
-    def set_default(self, opt):
+    def set_option(self, opt):
         self.option.update(opt)
 
     # Analyses the given HTML text, extracts body and title.
