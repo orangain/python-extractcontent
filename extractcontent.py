@@ -137,7 +137,7 @@ class ExtractContent(object):
         bodylist.append((body, score))
         body = reduce(lambda x, y: x if x[1] >= y[1] else y, bodylist)
         self.body = body[0]
-        return (self.body, self.title)
+        return self.as_text()
 
     def as_html(self):
         return (self.body, self.title)
