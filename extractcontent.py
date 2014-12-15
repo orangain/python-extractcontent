@@ -12,12 +12,12 @@ class ExtractContent(object):
         "lt": "<",
         "gt": "<",
         "amp": "&",
-        "laquo": '\x00\xc2\xab', # u"\x00\xab".encode("utf-8")
-        "raquo": '\x00\xc2\xbb', # u"\x00\xbb".encode("utf-8")
+        "laquo": '\x00\xc2\xab',  # u"\x00\xab".encode("utf-8")
+        "raquo": '\x00\xc2\xbb',  # u"\x00\xbb".encode("utf-8")
     }
 
     # Default option parameters.
-    default = {
+    option = {
         "threshold": 100,
         # threshold for score of the text
         "min_length": 80,
@@ -26,11 +26,11 @@ class ExtractContent(object):
         # decay factor for block score
         "continuous_factor": 1.62,
         # continuous factor for block score
-        #( the larger, the harder to continue )
+        # ( the larger, the harder to continue )
         "punctuation_weight": 10,
         # score weight for punctuations
-        "punctuations": r"""(?is)(\343\200[\201\202]|\357\274
-        [\201\214\216\237]|\.[^A-Za-z0-9]|,[^0-9]|!|\?)""",
+        "punctuations": (r"(?is)(\343\200[\201\202]|\357\274"
+                         r"[\201\214\216\237]|\.[^A-Za-z0-9]|,[^0-9]|!|\?)"),
         # punctuation characters
         "waste_expressions": r"(?i)Copyright|All Rights Reserved",
         # characteristic keywords including footer
@@ -39,46 +39,44 @@ class ExtractContent(object):
     }
 
     def __init__(self, opt=None):
-        if opt != None:
-            self.default.update(opt)
+        if opt is not None:
+            self.option.update(opt)
         self.title = ''
         self.body = ''
 
     # Sets option parameters to default.
     # Parameter opt is given as Dictionary.
     def set_default(self, opt):
-        self.default.update(opt)
+        self.option.update(opt)
 
     # Analyses the given HTML text, extracts body and title.
     def analyse(self, html, opt=None):
         # flameset or redirect
-        if re.search(r"""(?i)<\/frameset>|<meta\s+http-equiv\s*=\s*
-                [\"']?refresh['\"]?[^>]*url""", html) != None:
+        if re.search((r"(?i)<\/frameset>|<meta\s+http-equiv\s*=\s*"
+                      r"[\"']?refresh['\"]?[^>]*url"), html) is not None:
             return ["", self.extract_title(html)]
 
         # option parameters
         if opt:
-            self.default.update(opt)
-            opt = self.default
-        else:
-            opt = self.default
+            self.option.update(opt)
+        opt = self.option
 
         # header & title
         header = re.match(r"(?s)</head\s*>", html)
-        if header != None:
+        if header is not None:
             html = html[:header.end()]
             title = self.extract_title(html[0:header.start()])
         else:
             title = self.extract_title(html)
 
         # Google AdSense Section Target
-        html = re.sub(r"""(?is)<!--\s*google_ad_section_start\(weight=
-                ignore\)\s*-->.*?<!--\s*google_ad_section_end.*?-->""",
+        html = re.sub((r"(?is)<!--\s*google_ad_section_start\(weight="
+                       r"ignore\)\s*-->.*?<!--\s*google_ad_section_end.*?-->"),
                 "", html)
         if re.search(r"(?is)<!--\s*google_ad_section_start[^>]*-->",
-                html) != None:
-            result = re.findall(r"""(?is)<!--\s*google_ad_section_start
-                    [^>]*-->.*?<!--\s*google_ad_section_end.*?-->""", html)
+                html) is not None:
+            result = re.findall((r"(?is)<!--\s*google_ad_section_start"
+                                 r"[^>]*-->.*?<!--\s*google_ad_section_end.*?-->"), html)
             html = "\n".join(result)
 
         # eliminate useless text
@@ -96,49 +94,50 @@ class ExtractContent(object):
         score = 0
         bodylist = []
         list = \
-        re.split(r"""</?(?:div|center|td)[^>]*>|<p\s*[^>]*class\s*=\s*
-                [\"']?(?:posted|plugin-\w+)['\"]?[^>]*>""", html)
+            re.split((r"</?(?:div|center|td)[^>]*>|<p\s*[^>]*class\s*=\s*"
+                      r"[\"']?(?:posted|plugin-\w+)['\"]?[^>]*>"), html)
         for block in list:
             if self._has_only_tags(block):
                 continue
 
             if len(body) > 0:
-                continuous /= opt["continuous_factor"]
+                continuous /= self.option["continuous_factor"]
 
             # ignore link list block
             notlinked = self._eliminate_link(block)
-            if len(notlinked) < opt["min_length"]:
+            if len(notlinked) < self.option["min_length"]:
                 continue
 
             # calculate score of block
             c = (len(notlinked) + self._count_pattern(notlinked,
-                opt["punctuations"]) * opt["punctuation_weight"]) * factor
-            factor *= opt["decay_factor"]
+                self.option["punctuations"]) * self.option["punctuation_weight"]) * factor
+            factor *= self.option["decay_factor"]
             not_body_rate = self._count_pattern(block,
-                opt["waste_expressions"]) + self._count_pattern(block,
+                self.option["waste_expressions"]) + self._count_pattern(block,
                         r"amazon[a-z0-9\.\/\-\?&]+-22") / 2.0
             if not_body_rate > 0:
                 c *= (0.72 ** not_body_rate)
             c1 = c * continuous
-            if opt["debug"]:
-                print "----- %f*%f=%f %d \n%s" %\
+            if self.option["debug"]:
+                print("----- %f*%f=%f %d \n%s" %\
                     (c, continuous, c1, len(notlinked),
-                            self._strip_tags(block)[0:100])
+                            self._strip_tags(block)[0:100]))
 
             # tread continuous blocks as cluster
-            if c1 > opt["threshold"]:
+            if c1 > self.option["threshold"]:
                 body += block + "\n"
                 score += c1
-                continuous = opt["continuous_factor"]
-            elif c > opt["threshold"]:  # continuous block end
+                continuous = self.option["continuous_factor"]
+            elif c > self.option["threshold"]:  # continuous block end
                 bodylist.append((body, score))
                 body = block + "\n"
                 score = c
-                continuous = opt["continuous_factor"]
+                continuous = self.option["continuous_factor"]
 
         bodylist.append((body, score))
         body = reduce(lambda x, y: x if x[1] >= y[1] else y, bodylist)
         self.body = body[0]
+        return (self.body, self.title)
 
     def as_html(self):
         return (self.body, self.title)
@@ -149,7 +148,7 @@ class ExtractContent(object):
     # Extract title.
     def extract_title(self, st):
         result = re.search(r"(?s)<title[^>]*>\s*(.*?)\s*</title\s*>", st)
-        if result != None:
+        if result is not None:
             return self._strip_tags(result.group(0))
         else:
             return ""
@@ -157,7 +156,7 @@ class ExtractContent(object):
     # Count a pattern from text.
     def _count_pattern(self, text, pattern):
         result = re.search(pattern, text)
-        if result == None:
+        if result is None:
             return 0
         else:
             return len(result.span())
@@ -174,20 +173,20 @@ class ExtractContent(object):
     def _eliminate_useless_tags(self, html):
         # Eliminate useless symbols
         html = html.encode('utf-8')
-        html = re.sub(r"""\342(?:\200[\230-\235]|\206[\220-\223]|
-                \226[\240-\275]|\227[\206-\257]|\230[\205\206])""",
+        html = re.sub((r"\342(?:\200[\230-\235]|\206[\220-\223]|"
+                       r"\226[\240-\275]|\227[\206-\257]|\230[\205\206])"),
                 "", html)
         html = html.decode('utf-8')
         # Eliminate useless html tags
         html = \
-        re.sub(r"""(?is)<(script|style|select|noscript)[^>]*>.*?</\1\s*>""",
+            re.sub(r"(?is)<(script|style|select|noscript)[^>]*>.*?</\1\s*>",
                 "", html)
         html = re.sub(r"(?s)<!--.*?-->", "", html)
         html = re.sub(r"<![A-Za-z].*?>/s", "", html)
-        html = re.sub(r"""(?s)<div\s[^>]*class\s*=\s*['\"]?alpslab-slide
-                [\"']?[^>]*>.*?</div\s*>""", "", html)
-        html = re.sub(r"""(?is)<div\s[^>]*(id|class)\s*=\s*['\"]
-                ?\S*more\S*[\"']?[^>]*>""", "", html)
+        html = re.sub((r"(?s)<div\s[^>]*class\s*=\s*['\"]?alpslab-slide"
+                       r"[\"']?[^>]*>.*?</div\s*>"), "", html)
+        html = re.sub((r"(?is)<div\s[^>]*(id|class)\s*=\s*['\"]"
+                       r"?\S*more\S*[\"']?[^>]*>"), "", html)
         return html
 
     # Checks if the given block has only tags without text.
@@ -210,7 +209,7 @@ class ExtractContent(object):
     # determines whether a block is link list or not
     def _islinklist(self, st):
         result = re.search(r"(?is)<(?:ul|dl|ol)(.+?)</(?:ul|dl|ol)>", st)
-        if result != None:
+        if result is not None:
             listpart = result.group(1)
             outside = re.sub(r"(?is)<(?:ul|dl)(.+?)</(?:ul|dl)>", "", st)
             outside = re.sub(r"(?is)<.+?>", "", outside)
@@ -227,7 +226,7 @@ class ExtractContent(object):
         hit = 0
         href = re.compile("<a\s+href=(['\"]?)([^\"'\s]+)\1", re.I | re.S)
         for line in list:
-            if href.search(line) != None:
+            if href.search(line) is not None:
                 hit += 1
         return 9 * (1.0 * hit / len(list)) ** 2 + 1
 
@@ -235,7 +234,7 @@ class ExtractContent(object):
     def _strip_tags(self, html):
         st = re.sub(r"(?s)<.+?>", "", html)
         # Convert from wide character to ascii
-        if type(st) != str:
+        if st and type(st) != str:
             st = unicodedata.normalize("NFKC", st)
             st = st.encode('utf-8')
         st = re.sub(r'\342[\224\225][\200-\277]', '', st)  # keisen
