@@ -59,15 +59,14 @@ class ExtractContent(object):
         # option parameters
         if opt:
             self.option.update(opt)
-        opt = self.option
 
         # header & title
         header = re.match(r"(?s)</head\s*>", html)
         if header is not None:
             html = html[:header.end()]
-            title = self.extract_title(html[0:header.start()])
+            self.title = self.extract_title(html[0:header.start()])
         else:
-            title = self.extract_title(html)
+            self.title = self.extract_title(html)
 
         # Google AdSense Section Target
         html = re.sub((r"(?is)<!--\s*google_ad_section_start\(weight="
@@ -83,7 +82,7 @@ class ExtractContent(object):
         html = self._eliminate_useless_tags(html)
 
         # heading tags including title
-        self.title = title
+        # self.title = title
         html = re.sub(r"(?s)(<h\d\s*>\s*(.*?)\s*</h\d\s*>)",
                 self._estimate_title, html)
 
@@ -93,10 +92,8 @@ class ExtractContent(object):
         body = ''
         score = 0
         bodylist = []
-        list = \
-            re.split((r"</?(?:div|center|td)[^>]*>|<p\s*[^>]*class\s*=\s*"
-                      r"[\"']?(?:posted|plugin-\w+)['\"]?[^>]*>"), html)
-        for block in list:
+        block_list = self._split_to_blocks(html)
+        for block in block_list:
             if self._has_only_tags(block):
                 continue
 
@@ -153,6 +150,12 @@ class ExtractContent(object):
         else:
             return ""
 
+    def _split_to_blocks(self, html):
+        block_list = \
+            re.split((r"</?(?:div|center|td)[^>]*>|<p\s*[^>]*class\s*=\s*"
+                      r"[\"']?(?:posted|plugin-\w+)['\"]?[^>]*>"), html)
+        return block_list
+
     # Count a pattern from text.
     def _count_pattern(self, text, pattern):
         result = re.search(pattern, text)
@@ -202,6 +205,7 @@ class ExtractContent(object):
         notlinked, count = re.subn(r"(?is)<a\s[^>]*>.*?<\/a\s*>", "", html)
         notlinked = re.sub(r"(?is)<form\s[^>]*>.*?</form\s*>", "", notlinked)
         notlinked = self._strip_tags(notlinked)
+        # returns empty string when html contains many links or list of links
         if (len(notlinked) < 20 * count) or (self._islinklist(html)):
             return ""
         return notlinked
