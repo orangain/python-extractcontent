@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- encoding:utf-8 -*-
+from __future__ import print_function
+
 import re
 import unicodedata
 
@@ -250,4 +252,23 @@ class ExtractContent(object):
         return st
 
 if __name__ == "__main__":
-    pass
+    import sys
+    import urllib2
+
+    def usage():
+        print(u'Usage: {0} URL'.format(sys.argv[0]), file=sys.stderr)
+        exit(1)
+
+    try:
+        url = sys.argv[1]
+    except IndexError:
+        usage()
+    if not re.search(r'^https?://', url):
+        usage()
+
+    request = urllib2.Request(url, headers={'User-Agent': 'extractcontent.py/0.0.1'})
+    html = urllib2.urlopen(request).read().decode('utf-8')
+    extractor = ExtractContent()
+    text, title = extractor.analyse(html)
+
+    print(u'Title: {0}\n\n{1}'.format(title, text))
