@@ -267,7 +267,11 @@ if __name__ == "__main__":
         usage()
 
     request = urllib2.Request(url, headers={'User-Agent': 'extractcontent.py/0.0.1'})
-    html = urllib2.urlopen(request).read().decode('utf-8')
+    f = urllib2.urlopen(request)
+    content_type = f.info().getheader('Content-Type')
+    match = re.search(r'charset=([\w-]+)', content_type)
+    encoding = match.group(1) if match else 'utf-8'
+    html = f.read().decode(encoding)
     extractor = ExtractContent()
     text, title = extractor.analyse(html)
 
